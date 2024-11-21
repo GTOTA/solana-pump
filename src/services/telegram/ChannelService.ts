@@ -25,7 +25,7 @@ export interface ChannelService {
 
 
 // Child class implements ChannelService
-export class NewPoolChannelService implements ChannelService {
+export class GMGNChannelService implements ChannelService {
     channelId: string;
 
     telegramClient: TelegramListenerService;
@@ -53,17 +53,14 @@ export class NewPoolChannelService implements ChannelService {
                childId = event.message.replyTo.replyToTopId.toString()
             else if(event.message.replyTo.replyToMsgId)
                childId = event.message.replyTo.replyToMsgId.toString()
-            if(childId != CHANNEL.KOLBUY_ID) return          
+            if(childId != CHANNEL.KOLBUY_ID && childId != CHANNEL.HEAVYBOUGHT_ID) return          
         }
         
-        console.log('handle channel:', channelId,childId); 
-
         const msg = utils.parseAlertMessage(message.text);
         if (msg == undefined || msg.ca == undefined) {
             console.log(' parseChannelMsg error', msg);
             return
         }
-
 
         const messageData: MessageData = {
             id: channelId,

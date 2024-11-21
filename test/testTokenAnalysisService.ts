@@ -7,9 +7,8 @@ import * as StringUtils from '../src/utils/StringUtils'
 import { promises as fs } from 'fs';
 import dotenv from 'dotenv';
 import { CHANNEL } from '../src/services/telegram/types';
-import { TokenInfo } from '../src/services/analysis/types';
-import { NewPoolChannelService } from '../src/services/telegram/channelService';
-import { CryptoAlert } from '../src/utils/types';
+import { GMGNChannelService } from '../src/services/telegram/ChannelService';
+
 
 const { createClient } = require('redis')
 dotenv.config();
@@ -89,7 +88,7 @@ async function testTelegramMessageData(processor: RedisStreamProcessor) {
 
         const messages = await telegram_client.getChannelMessages(channelUsername, 10);
 
-        const poolService = new NewPoolChannelService(channelUsername, telegram_client, processor)
+        const poolService = new GMGNChannelService(channelUsername, telegram_client, processor)
 
         const newpool = await telegram_client.getEntity(CHANNEL.GMSINAL_NAME);
 

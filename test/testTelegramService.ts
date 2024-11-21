@@ -1,10 +1,9 @@
 import { TelegramListenerService } from "../src/services/telegram";
 import { MessageData, RedisStreamProcessor } from "../src/services/message";
-import { NewPoolChannelService } from "../src/services/telegram/channelService";
 import { CHANNEL } from "../src/services/telegram/types";
 import { CacheManager } from "../src/services/cache";
-import { TokenInfo } from "../src/models/token";
 import { StringSession } from "telegram/sessions/StringSession";
+import * as StringUtils from '../src/utils/StringUtils'
 
 const fs = require('fs').promises;
 const { createClient } = require('redis');
@@ -51,31 +50,6 @@ async function main() {
         const channel_gm= await client.getEntity('@gmgnsignals')
         console.log(channel_gm)
 
-        return
-        // 保存消息
-        await client.saveMessages(messages);
-
-        // // 创建消息处理器
-        // const handleNewMessage = async (event) => {
-        //     const message = event.message;
-
-        //     // 格式化消息
-        //     const formattedMessage = {
-        //         id: message.id,
-        //         date: message.date.toString(),
-        //         text: message.text,
-        //         views: message.views,
-        //         forwards: message.forwards,
-        //         mediaType: message.media ? message.media.className : null,
-        //     };
-
-        //     console.log('handle new pool msg:', formattedMessage);
-
-        // };
-
-        // // 监听新消息
-        // await client.watchNewMessages(channelUsername,handleNewMessage);
-
         const redis_client = createClient({
             url: process.env.REDIS_URL || '',
             password: process.env.REDIS_PASSWORD || '',
@@ -112,17 +86,10 @@ async function main() {
         await processor.initialize();
         await processor.startProcessing();
     
-
-
-
         const new_pool_channel = '-1002122751413'
 
         const channel = await client.getEntity(channelUsername);
        
-        const poolService = new NewPoolChannelService(new_pool_channel, client, processor)
-
-        //poolService.registChannelCallback([channel.id.valueOf()])
-
         // Example usage:
         const msg = `**💊💊Pump市值飙升 FDV Surge Alert**
         
@@ -146,7 +113,7 @@ async function main() {
         ⏳ DEV: 🚨 Sell All
         👨‍🍳 DEV Burnt烧币: -`;
 
-        const token = poolService.parseChannelMsg(CHANNEL.ALERTPOOL_ID,msg)
+        const token = StringUtils.parseAlertMessage(msg)
 
         await CacheManager.getInstance().cacheInfo(token['ca'] + 'text', token)
 
