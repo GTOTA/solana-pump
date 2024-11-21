@@ -6,8 +6,6 @@ import * as StringUtils from '../../utils/StringUtils';
 import input from 'input'; 
 import fs from 'fs/promises'
 import { CHANNEL } from './types';
-
-
 require('dotenv').config();
 
 export class TelegramListenerService {
@@ -43,7 +41,7 @@ export class TelegramListenerService {
             // Create client instance
             this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {
                 connectionRetries: 5,
-                proxy:{socksType:5,ip:'127.0.0.1',port :1080}
+                proxy: process.env.PROXY=='true'?{socksType:5,ip:'127.0.0.1',port :1080}:undefined
             });
 
             // Connect to Telegram server
