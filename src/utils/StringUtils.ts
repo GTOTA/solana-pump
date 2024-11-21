@@ -14,6 +14,7 @@ const emojiMap: { [key: string]: boolean } = {
 };
 
 export function convertCurrencyStringToNumber(currencyStr: string): number {
+  if(!currencyStr || currencyStr == undefined) return 0;
   // 移除所有空格和货币符号
   let str = currencyStr.replace(/[\s$]/g, '');
   
@@ -127,7 +128,7 @@ export function parseAlertMessage(text: string): CryptoAlert {
     }
     //'💧 Liq: **4,340.64** **SOL** ($2.1M 🔥100%)\n'
     if(line.includes('💧')) {
-      const pattern = /Liq: (\d+\,?\d+\.?\d*[KM]?) SOL \(\$(\d+\.?\d*[KM]?) \🔥(\d+\%)\)/;
+      const pattern = /Liq: (\d+\,?\d+\.?\d*[KM]?) SOL \(\$(\d+\.?\d*[KM]?) \🔥(\d+\.?\d*\%)\)/;
       const matches = line.match(pattern) 
       if(matches && matches[2]){
         result['liq'] = matches[2]
@@ -193,6 +194,7 @@ export function toCamelCase(text: string): string {
 
 export function percentToDecimal(percentStr: string): number {
   // 移除 '%' 并转换为数字，然后除以 100
+  if(!percentStr || percentStr ==  undefined) return 0
   return Number(percentStr.replace('%', '')) / 100;
 }
 
@@ -291,7 +293,7 @@ const kol_buy = `** 3 KOL Buy ****$MIKU****!**
 📈 5m | 1h | 6h: **35.34%** | **-47.86%** | **11.4K%**
 🎲 5m TXs/Vol: **283**/**$115.6K**
 💡 MCP: **$2.1M**
-💧 Liq: **2,440.76** **SOL** ($210.1K 🔥100%)
+💧 Liq: **161.99** **SOL** ($80K 🔥97.34%)
 👥 Holder: **3319**
 🕒 Open: **2d** **ago**
 
@@ -358,7 +360,7 @@ const heavy_bought = '**💊Heavy Bought💊**\n' +
     '📈 5m | 1h | 6h: **11.95%** | **-16.6%** | **>99999%**\n' +
     '🎲 5m TXs/Vol: **1274**/**$1.3M**\n' +
     '💡 MCP: **$72.6M**\n' +
-    '💧 Liq: **4,340.64** **SOL** ($2.1M 🔥100%)\n' +
+    '💧 Liq: **161.99** **SOL** ($80K 🔥97.34%)\n' +
     '👥 Holder: **10967**\n' +
     '🕒 Open: **5h** **ago**\n' +
     '\n' +
@@ -400,5 +402,5 @@ const exampleText = `**💊💊Pump市值飙升 FDV Surge Alert**
 // const parsed = parseAlertMessage(kol_buy);
 // console.log(parsed);
 
-// const alert_msg = parseAlertMessage(heavy_bought)
-// console.log(alert_msg);
+const alert_msg = parseAlertMessage(heavy_bought)
+console.log(alert_msg);
