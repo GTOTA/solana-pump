@@ -53,7 +53,10 @@ export class GMGNChannelService implements ChannelService {
                childId = event.message.replyTo.replyToTopId.toString()
             else if(event.message.replyTo.replyToMsgId)
                childId = event.message.replyTo.replyToMsgId.toString()
-            if(childId != CHANNEL.KOLBUY_ID && childId != CHANNEL.HEAVYBOUGHT_ID) return          
+            if(childId != CHANNEL.KOLBUY_ID && childId != CHANNEL.HEAVYBOUGHT_ID) return 
+            console.log("********************************************")         
+            console.log(message.text)  
+            console.log("********************************************")                
         }
         
         const msg = utils.parseAlertMessage(message.text);

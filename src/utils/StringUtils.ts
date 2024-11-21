@@ -44,7 +44,6 @@ function extractContractAddress(input: string): string | null {
 }
 
 export function parseAlertMessage(text: string): CryptoAlert {
-  console.log(text)
   // Split the text into lines
   const lines = text.split('\n');
   const result: CryptoAlert = {};
