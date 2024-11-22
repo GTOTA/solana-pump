@@ -115,22 +115,6 @@ export class TelegramListenerService {
     async getEntity(channelUsername) {
         return await this.client.getEntity(channelUsername);
     }
-    /**
-     * Save messages to file
-     */
-    async saveMessages(messages, filename = 'messages.json') {
-        try {
-            await fs.writeFile(
-                filename,
-                JSON.stringify(messages, null, 2),
-                'utf8'
-            );
-            console.log(`Messages saved to ${filename}`);
-        } catch (error) {
-            console.error('Failed to save messages:', error);
-            throw error;
-        }
-    }
 
     /**
      * Watch for new messages

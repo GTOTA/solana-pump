@@ -1,10 +1,9 @@
 import { MessageData, RedisStreamProcessor } from "../message";
 import { TelegramListenerService } from ".";
 import * as utils from '../../utils/StringUtils'
-import { HttpApi } from "../../utils/HttpUtils";
-import { ResponseTokenInfo } from "../../utils/types";
-import { CacheManager } from "../cache";
 import { CHANNEL } from "./types";
+import { promises as fs } from 'fs';
+
 
 // Define the message interface
 export interface ChannelMessage {
@@ -14,6 +13,7 @@ export interface ChannelMessage {
 
 // Define callback function type
 export type ChannelCallback = (msg: ChannelMessage) => void;
+
 
 export interface ChannelService {
     channelId: string;
@@ -38,6 +38,23 @@ export class GMGNChannelService implements ChannelService {
         this.msgQueue = msgQueue;
     }
 
+    /**
+     * Save messages to file
+     */
+    async saveMessages(messages, filename = 'messages.json') {
+        try {
+            await fs.appendFile(
+                filename,
+                JSON.stringify(messages, null, 2),
+                'utf8'
+            );
+            //console.log(`Messages saved to ${filename}`);
+        } catch (error) {
+            console.error('Failed to save messages:', error);
+            throw error;
+        }
+    }
+
     handleChannelMsg = async (event) => {
         const message = event.message;
         if (message.text == undefined) {
@@ -53,10 +70,7 @@ export class GMGNChannelService implements ChannelService {
                childId = event.message.replyTo.replyToTopId.toString()
             else if(event.message.replyTo.replyToMsgId)
                childId = event.message.replyTo.replyToMsgId.toString()
-            if(childId != CHANNEL.KOLBUY_ID && childId != CHANNEL.HEAVYBOUGHT_ID) return 
-            console.log("********************************************")         
-            console.log(message.text)  
-            console.log("********************************************")                
+            if(childId != CHANNEL.KOLBUY_ID && childId != CHANNEL.HEAVYBOUGHT_ID) return
         }
         
         const msg = utils.parseAlertMessage(message.text);
@@ -71,6 +85,8 @@ export class GMGNChannelService implements ChannelService {
             msg: JSON.stringify(msg),
             timestamp: (new Date()).toLocaleString()
         };
+
+        await this.saveMessages(messageData,utils.MSG_FILE)
 
         await this.msgQueue.addMessage(messageData);
     }

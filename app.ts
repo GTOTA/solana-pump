@@ -85,7 +85,7 @@ async function listenTelegramMessageData(processor: RedisStreamProcessor) {
 
         const gmgn_pool = await telegram_client.getEntity(CHANNEL.GMSINAL_NAME);
 
-        const pumpfull_pool = await telegram_client.getEntity(CHANNEL.PUMP_FULL_NAME);
+        //const pumpfull_pool = await telegram_client.getEntity(CHANNEL.PUMP_FULL_NAME);
 
         poolService.registChannelCallback([gmgn_pool.id.valueOf()])
 

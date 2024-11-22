@@ -60,8 +60,8 @@ export function parseAlertMessage(text: string): CryptoAlert {
 
     if(line.startsWith('$')){
       const items = line.split('(').map(key => key.trim());
-      result['symbol'] = items[0].substring(1,items[0].length)
-      result['name'] = items[1].substring(0,items[1].length-1)
+      result['symbol'] = (items[0]!=undefined && items[0]!=null )?items[0].substring(1,items[0].length):''
+      result['name'] = (items[1]!=undefined && items[1]!=null )?items[1].substring(0,items[1].length-1):''
       return
     }
 
@@ -277,7 +277,8 @@ function test() {
 //test();  
 
 const path = require('path')
-export const SESSION_PATH = require('path').join(path.dirname(__dirname), './res/session.txt')
+export const SESSION_PATH = path.join(path.dirname(__dirname), './res/session.txt')
+export const MSG_FILE =path.join(path.dirname(__dirname), './res/message.txt')
 
 
 const kol_buy = `** 3 KOL Buy ****$MIKU****!**
