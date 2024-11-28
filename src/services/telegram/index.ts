@@ -31,7 +31,7 @@ export class TelegramListenerService {
         this.session = new StringSession(config.session);
         this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {})
         this.messageLimiter = new MessageRateLimiter();
-        this.bot = new Bot(process.env.BOT2_TOKEN || '')
+        this.bot = new Bot(process.env.BOT_TOKEN || '')
 
     }
 
