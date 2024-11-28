@@ -279,6 +279,8 @@ function test() {
 const path = require('path')
 export const SESSION_PATH = path.join(path.dirname(__dirname), './res/session.txt')
 export const MSG_FILE =path.join(path.dirname(__dirname), './res/message.txt')
+export const PUMP_FILE =path.join(path.dirname(__dirname), './res/pump_idl.json')
+
 
 
 const kol_buy = `** 3 KOL Buy ****$MIKU****!**
@@ -402,5 +404,5 @@ const exampleText = `**💊💊Pump市值飙升 FDV Surge Alert**
 // const parsed = parseAlertMessage(kol_buy);
 // console.log(parsed);
 
-const alert_msg = parseAlertMessage(heavy_bought)
-console.log(alert_msg);
+//const alert_msg = parseAlertMessage(heavy_bought)
+//console.log(alert_msg);

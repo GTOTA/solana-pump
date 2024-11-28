@@ -83,16 +83,17 @@ async function testTelegramMessageData(processor: RedisStreamProcessor) {
     try {
         await telegram_client.connect({});
         // 获取频道消息
-        const channelUsername = '@Faster100x'; // 替换为实际的频道用户名
-        //const channelUsername = process.env.CHANNEL_USERNAME; // 替换为实际的频道用户名
+        //const channelUsername = '@golddogscan'; // 替换为实际的频道用户名
+        const channelUsername = process.env.CHANNEL_USERNAME; // 替换为实际的频道用户名
 
         const messages = await telegram_client.getChannelMessages(channelUsername, 10);
 
         const poolService = new GMGNChannelService(channelUsername, telegram_client, processor)
 
         const newpool = await telegram_client.getEntity(CHANNEL.GMSINAL_NAME);
+        console.log(newpool)
 
-        const alertpool = await telegram_client.getEntity(CHANNEL.PUMP_FULL_NAME);
+        //const alertpool = await telegram_client.getEntity(CHANNEL.PUMP_FULL_NAME);
 
         poolService.registChannelCallback([newpool.id.valueOf()])
 

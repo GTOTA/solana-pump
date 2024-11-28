@@ -6,6 +6,10 @@ import * as StringUtils from '../../utils/StringUtils';
 import input from 'input'; 
 import fs from 'fs/promises'
 import { CHANNEL } from './types';
+import { FloodWaitError } from 'telegram/errors';
+import { wait } from '../../utils/timeUtils';
+import { Bot } from 'grammy';
+import { MessageRateLimiter } from './messageLimit';
 require('dotenv').config();
 
 export class TelegramListenerService {
@@ -16,6 +20,9 @@ export class TelegramListenerService {
     private apiHash:string;
     private session:StringSession;
     private client:TelegramClient;
+    private messageLimiter:MessageRateLimiter;
+    private bot:Bot;
+
     private static instance:TelegramListenerService;
 
     private constructor(config?) {
@@ -23,6 +30,9 @@ export class TelegramListenerService {
         this.apiHash =config.apiHash;
         this.session = new StringSession(config.session);
         this.client = new TelegramClient(this.session, this.apiId, this.apiHash, {})
+        this.messageLimiter = new MessageRateLimiter();
+        this.bot = new Bot(process.env.BOT2_TOKEN || '')
+
     }
 
     public static getInstance(config?): TelegramListenerService {
@@ -109,7 +119,22 @@ export class TelegramListenerService {
 
     async sendMessages(text) {
         console.log("sendmessg" ,text)
-        this.client.sendMessage(CHANNEL.DOG, {message: text})   
+        try {
+
+            if (this.messageLimiter.sendMessage()) {
+                await this.bot.api.sendMessage(CHANNEL.DOG, text);
+                //this.client.sendMessage(CHANNEL.DOG, {message: text})
+            }
+        }catch(e){
+            if( e instanceof FloodWaitError) {
+               console.error(`Flood wait for ${e.seconds} seconds`)
+               wait(e.seconds*1000)
+               return
+            }
+            else
+               console.error('Failed to sendMessage :', e)
+            throw e;
+        }
     }
 
     async getEntity(channelUsername) {

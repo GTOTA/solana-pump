@@ -90,6 +90,16 @@ export class TokenAnalysisService {
         🔥 烧池子:  ${tokenInfo.lpburn}`
         TelegramListenerService.getInstance().sendMessages(new_pool_text)
       } else if (message.id == CHANNEL.GMSINAL_ID) {
+        if(tokenInfo.kolInflow == undefined) {
+          tokenInfo.kolInflow = 0
+          tokenInfo.kolBuySell = 0
+        }
+        if(tokenInfo.heavybought == undefined) {
+          tokenInfo.heavybought = 0
+        }
+        if(tokenInfo.price == undefined) {
+          tokenInfo.price = 0
+        }
         const alert_text = `**💊Heavy Bought ${tokenInfo.heavybought} SOL💊**
         **🤤这是第${tokenInfo.alert}次提醒⏰ **
         **💳 KOL inflow: ${tokenInfo.kolInflow} SOL**
