@@ -52,7 +52,6 @@ export class TokenAnalysisService {
       console.log("it is time to buy token:", tokenInfo.symbol)
       tokenInfo.alert = tokenInfo.alert == undefined ? 1 : ++tokenInfo.alert
       this.cacheManager.cacheInfo(tokenInfo.ca, tokenInfo)
-      TelegramListenerService.getInstance().sendMessages(tokenInfo.ca)
 
       if (message.id == CHANNEL.ALERTPOOL_ID) {
         const alert_text = `**💊💊Pump市值飙升 FDV Surge Alert**
