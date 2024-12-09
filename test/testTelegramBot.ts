@@ -22,10 +22,12 @@ interface SessionData {
 // 对上下文类型进行修饰以包含会话。
 type MyContext = Context & SessionFlavor<SessionData>;
 
+const proxy =process.env.BOT_PROXY || 'false'
+
 const bot = new Bot<MyContext>(process.env.BOT2_TOKEN || "", {
   client: {
     baseFetchConfig: {
-      agent: socksAgent,
+      agent: proxy=='true'?socksAgent:null,
       compress: true,
     },
   },
@@ -259,3 +261,4 @@ async function testBotApi() {
 }
 
 testBotApi();
+
