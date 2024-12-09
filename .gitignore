@@ -1,0 +1,8 @@
+node_modules
+.env
+*.sh
+yarn*
+src/res/encrypted-wallet.json
+src/res/message.txt
+src/res/pump_idl.json
+src/res/session.txt

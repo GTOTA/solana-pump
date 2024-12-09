@@ -49,7 +49,7 @@ export class TokenAnalysisService {
     console.log(tokenInfo)
 
     if (this.analyzeTokenInfo(message.id,message.child,tokenInfo)) {
-      console.log("it is time to buy token:", tokenInfo.symbol)
+      console.log("it is time to buy token:", tokenInfo.symbol,tokenInfo.alert)
       tokenInfo.alert = tokenInfo.alert == undefined ? 1 : ++tokenInfo.alert
       this.cacheManager.cacheInfo(tokenInfo.ca, tokenInfo)
 

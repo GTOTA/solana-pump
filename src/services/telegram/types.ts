@@ -15,5 +15,7 @@ export class CHANNEL {
 
 
     public static DOG =  '@golddogscan'   
+    public static DOG_BOT =  '@potatodog_bot'
+
 
 }

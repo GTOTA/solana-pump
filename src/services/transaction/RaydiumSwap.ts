@@ -1,0 +1,395 @@
+import { 
+  Connection, 
+  PublicKey, 
+  Keypair, 
+  Transaction,
+  VersionedTransaction, 
+  TransactionMessage, 
+  BlockhashWithExpiryBlockHeight,
+  LAMPORTS_PER_SOL } from '@solana/web3.js'
+import {
+  Liquidity,
+  LiquidityPoolKeys,
+  jsonInfo2PoolKeys,
+  poolKeys2JsonInfo,
+  LiquidityPoolJsonInfo,
+  TokenAccount,
+  Token,
+  TokenAmount,
+  TOKEN_PROGRAM_ID,
+  Percent,
+  SPL_ACCOUNT_LAYOUT,
+} from '@raydium-io/raydium-sdk'
+import { Wallet } from '@coral-xyz/anchor'
+import bs58 from 'bs58'
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+import axios from "axios";
+import { SwapExecutor } from './Executor';
+
+import { fetchMarketAccounts, getPoolKeysByPoolId} from './RaydiumPool'
+dotenv.config();
+
+
+/**
+ * Class representing a Raydium Swap operation.
+ */
+export class RaydiumSwap implements SwapExecutor {
+  allPoolKeysJson: LiquidityPoolJsonInfo[]
+  connection: Connection
+  wallet: Wallet
+  private static instance:RaydiumSwap;
+
+  /**
+ * Create a RaydiumSwap instance.
+ * @param {string} RPC_URL - The RPC URL for connecting to the Solana blockchain.
+ * @param {string} WALLET_PRIVATE_KEY - The private key of the wallet in base58 format.
+ */
+  private constructor(keypair: Keypair) {
+  
+    this.connection  = new Connection(process.env.RPC_URL||'', { commitment: 'confirmed' })
+    this.wallet = new Wallet(keypair)
+    this.allPoolKeysJson = []
+  }
+
+  public static getInstance(keypair: Keypair): RaydiumSwap {
+    if (!RaydiumSwap.instance) {
+      RaydiumSwap.instance = new RaydiumSwap(keypair);
+    }
+    return RaydiumSwap.instance;
+  }
+  
+
+  async swap(inputMint: string, outputMint: string, inAmount: number,slippage:number) {
+
+  /**
+   * Find pool information for the given token pair.
+   */
+    // await this.loadPoolKeys('https://api.raydium.io/v2/sdk/liquidity/mainnet.json')
+
+    const poolKeys = await this.findPoolInfoForTokens(inputMint, outputMint);
+    if (!poolKeys) {
+      console.error('Pool info not found');
+      throw new Error("Pool info not found."); 
+    } else {
+      console.log('Found pool info');
+    }
+    // // Logging the fetched pool keys to the console
+    //console.log(poolKeys);
+    /**
+   * Prepare the swap transaction with the given parameters.
+   */
+    const tx = await this.getSwapTransaction(
+      outputMint,
+      inAmount,
+      poolKeys as LiquidityPoolKeys,
+      slippage
+    );
+
+    return tx
+
+  }
+
+  /**
+  * Loads all the pool keys available from a JSON configuration file.
+  * @async
+  * @returns {Promise<void>}
+  */
+  async loadPoolKeys(liquidityFile: string) {
+    let liquidityJson;
+    if (liquidityFile.startsWith('http')) {
+      const liquidityJsonResp = await fetch(liquidityFile);
+      if (!liquidityJsonResp.ok) return;
+      liquidityJson = await liquidityJsonResp.json();
+    } else {
+      liquidityJson = JSON.parse(fs.readFileSync(path.join(__dirname, liquidityFile), 'utf-8'));
+    }
+    const allPoolKeysJson = [...(liquidityJson?.official ?? []), ...(liquidityJson?.unOfficial ?? [])]
+
+    this.allPoolKeysJson = allPoolKeysJson
+  }
+
+  /**
+ * Finds pool information for the given token pair.
+ * @param {string} mintA - The mint address of the first token.
+ * @param {string} mintB - The mint address of the second token.
+ * @returns {LiquidityPoolKeys | null} The liquidity pool keys if found, otherwise null.
+ */
+  async findPoolInfoForTokens(mintA: string, mintB: string) {
+   
+    const poolData = this.allPoolKeysJson.find(
+      (i) => (i.baseMint === mintA && i.quoteMint === mintB) || (i.baseMint === mintB && i.quoteMint === mintA)
+    )
+    if (poolData) return jsonInfo2PoolKeys(poolData) as LiquidityPoolKeys
+    
+    console.log("start fetch PoolInfo ForTokens")
+    
+    var baseMint = mintA
+    var quoteMint = mintB
+
+    if(mintB == 'So11111111111111111111111111111111111111112') {
+      baseMint = mintB
+      quoteMint = mintA
+    }
+    
+    // Fetching market data for the tokens to retrieve the pool ID
+    const marketData = await fetchMarketAccounts(this.connection, new PublicKey(baseMint), new PublicKey(quoteMint), "confirmed");
+    // Fetching pool keys using the retrieved pool ID (marketData.id)
+    const poolKeys:LiquidityPoolKeys = await getPoolKeysByPoolId(marketData.id, this.connection) as LiquidityPoolKeys;
+
+    this.allPoolKeysJson.push(poolKeys2JsonInfo(poolKeys))
+    return poolKeys
+  }
+
+  /**
+ * Retrieves token accounts owned by the wallet.
+ * @async
+ * @returns {Promise<TokenAccount[]>} An array of token accounts.
+ */
+  async getOwnerTokenAccounts() {
+    const walletTokenAccount = await this.connection.getTokenAccountsByOwner(this.wallet.publicKey, {
+      programId: TOKEN_PROGRAM_ID,
+    })
+
+    return walletTokenAccount.value.map((i) => ({
+      pubkey: i.pubkey,
+      programId: i.account.owner,
+      accountInfo: SPL_ACCOUNT_LAYOUT.decode(i.account.data),
+    }))
+  }
+
+  /**
+ * Builds a swap transaction.
+ * @async
+ * @param {string} toToken - The mint address of the token to receive.
+ * @param {number} amount - The amount of the token to swap.
+ * @param {LiquidityPoolKeys} poolKeys - The liquidity pool keys.
+ * @param {number} [maxLamports=100000] - The maximum lamports to use for transaction fees.
+ * @param {boolean} [useVersionedTransaction=true] - Whether to use a versioned transaction.
+ * @param {'in' | 'out'} [fixedSide='in'] - The fixed side of the swap ('in' or 'out').
+ * @returns {Promise<Transaction | VersionedTransaction>} The constructed swap transaction.
+ */
+  async getSwapTransaction(
+    toToken: string,
+    amount: number,
+    poolKeys: LiquidityPoolKeys,
+    slippage:number,
+    maxLamports: number = 100000,
+    useVersionedTransaction = true,
+    fixedSide: 'in' | 'out' = 'in'
+  ): Promise<Transaction | VersionedTransaction> {
+    const directionIn = poolKeys.quoteMint.toString() == toToken
+    //const { minAmountOut, amountIn } = await this.calcAmountOut(poolKeys, amount, slippage, directionIn)
+    const {minAmountOut, amountIn } = await this.calcAmountOutByGm(poolKeys,amount,slippage,directionIn)
+
+    console.log(minAmountOut.toFixed(),amountIn.toFixed())
+
+    const userTokenAccounts = await this.getOwnerTokenAccounts()
+    const swapTransaction = await Liquidity.makeSwapInstructionSimple({
+      connection: this.connection,
+      makeTxVersion: useVersionedTransaction ? 0 : 1,
+      poolKeys: {
+        ...poolKeys,
+      },
+      userKeys: {
+        tokenAccounts: userTokenAccounts,
+        owner: this.wallet.publicKey,
+      },
+      amountIn: amountIn,
+      amountOut: minAmountOut,
+      fixedSide: fixedSide,
+      config: {
+        bypassAssociatedCheck: false,
+      },
+      computeBudgetConfig: {
+        microLamports: maxLamports,
+      },
+    })
+
+    const recentBlockhashForSwap = await this.connection.getLatestBlockhash()
+    const instructions = swapTransaction.innerTransactions[0].instructions.filter(Boolean)
+
+    if (useVersionedTransaction) {
+      const versionedTransaction = new VersionedTransaction(
+        new TransactionMessage({
+          payerKey: this.wallet.publicKey,
+          recentBlockhash: recentBlockhashForSwap.blockhash,
+          instructions: instructions,
+        }).compileToV0Message()
+      )
+
+      versionedTransaction.sign([this.wallet.payer])
+
+      return versionedTransaction
+    }
+
+    const legacyTransaction = new Transaction({
+      blockhash: recentBlockhashForSwap.blockhash,
+      lastValidBlockHeight: recentBlockhashForSwap.lastValidBlockHeight,
+      feePayer: this.wallet.publicKey,
+    })
+
+    legacyTransaction.add(...instructions)
+
+    return legacyTransaction
+  }
+
+  /**
+ * Sends a legacy transaction.
+ * @async
+ * @param {Transaction} tx - The transaction to send.
+ * @returns {Promise<string>} The transaction ID.
+ */
+  async sendLegacyTransaction(tx: Transaction, maxRetries?: number) {
+    const txid = await this.connection.sendTransaction(tx, [this.wallet.payer], {
+      skipPreflight: true,
+      maxRetries: maxRetries,
+    })
+
+    return txid
+  }
+
+  /**
+ * Sends a versioned transaction.
+ * @async
+ * @param {VersionedTransaction} tx - The versioned transaction to send.
+ * @returns {Promise<string>} The transaction ID.
+ */
+  async sendVersionedTransaction(tx: VersionedTransaction, maxRetries?: number) {
+    const txid = await this.connection.sendTransaction(tx, {
+      skipPreflight: true,
+      maxRetries: maxRetries,
+    })
+
+    return txid
+  }
+
+  /**
+    * Simulates a versioned transaction.
+    * @async
+    * @param {VersionedTransaction} tx - The versioned transaction to simulate.
+    * @returns {Promise<any>} The simulation result.
+    */
+  async simulateLegacyTransaction(tx: Transaction) {
+    const txid = await this.connection.simulateTransaction(tx, [this.wallet.payer])
+
+    return txid
+  }
+
+  /**
+ * Simulates a versioned transaction.
+ * @async
+ * @param {VersionedTransaction} tx - The versioned transaction to simulate.
+ * @returns {Promise<any>} The simulation result.
+ */
+  async simulateVersionedTransaction(tx: VersionedTransaction) {
+    const txid = await this.connection.simulateTransaction(tx)
+
+    return txid
+  }
+
+  /**
+ * Gets a token account by owner and mint address.
+ * @param {PublicKey} mint - The mint address of the token.
+ * @returns {TokenAccount} The token account.
+ */
+  getTokenAccountByOwnerAndMint(mint: PublicKey) {
+    return {
+      programId: TOKEN_PROGRAM_ID,
+      pubkey: PublicKey.default,
+      accountInfo: {
+        mint: mint,
+        amount: 0,
+      },
+    } as unknown as TokenAccount
+  }
+
+  async calcAmountOutByGm(poolKeys:LiquidityPoolKeys, inAmount: number,slippage:number,directionIn:boolean=true) {
+
+    let currencyInMint = poolKeys.baseMint
+    let currencyInDecimals = poolKeys.baseDecimals
+    let currencyOutMint = poolKeys.quoteMint
+    let currencyOutDecimals = poolKeys.quoteDecimals
+
+    if (!directionIn) {
+      currencyInMint = poolKeys.quoteMint
+      currencyInDecimals = poolKeys.quoteDecimals
+      currencyOutMint = poolKeys.baseMint
+      currencyOutDecimals = poolKeys.baseDecimals
+    }
+
+    const currencyIn = new Token(TOKEN_PROGRAM_ID, currencyInMint, currencyInDecimals)
+    const amountIn = new TokenAmount(currencyIn, inAmount, false)
+
+    const quoteParams = {
+        token_in_address: currencyInMint.toString(),
+        token_out_address: currencyOutMint.toString(),
+        in_amount:Math.round(inAmount*Math.pow(10,currencyInDecimals)),
+        from_address: this.wallet.publicKey.toString(),
+        slippage: slippage, //1%
+    };
+    
+    const quoteUrl = `https://gmgn.ai/defi/router/v1/sol/tx/get_swap_route`
+    const quoteResp = await axios.get(quoteUrl, { params: quoteParams })
+    if(quoteResp.status != 200 && !quoteResp.data.data && !quoteResp.data.data.quote) {
+      throw Error(`no quoteResp for pool: ${currencyInMint.toString()} and ${currencyOutMint.toString()}`)
+    }
+
+    console.log(quoteResp.data)
+    const currencyOut = new Token(TOKEN_PROGRAM_ID, currencyOutMint, currencyOutDecimals)
+    const minAmountOut = new TokenAmount(currencyOut, quoteResp.data.data.quote.otherAmountThreshold, true)
+
+    return {minAmountOut, amountIn}
+}
+
+  /**
+ * Calculates the amount out for a swap.
+ * @async
+ * @param {LiquidityPoolKeys} poolKeys - The liquidity pool keys.
+ * @param {number} rawAmountIn - The raw amount of the input token.
+ * @param {boolean} swapInDirection - The direction of the swap (true for in, false for out).
+ * @returns {Promise<Object>} The swap calculation result.
+ */
+  async calcAmountOut(poolKeys: LiquidityPoolKeys, rawAmountIn: number,slip:number,swapInDirection: boolean) {
+    const poolInfo = await Liquidity.fetchInfo({ connection: this.connection, poolKeys })
+
+    let currencyInMint = poolKeys.baseMint
+    let currencyInDecimals = poolInfo.baseDecimals
+    let currencyOutMint = poolKeys.quoteMint
+    let currencyOutDecimals = poolInfo.quoteDecimals
+
+    if (!swapInDirection) {
+      currencyInMint = poolKeys.quoteMint
+      currencyInDecimals = poolInfo.quoteDecimals
+      currencyOutMint = poolKeys.baseMint
+      currencyOutDecimals = poolInfo.baseDecimals
+    }
+
+    const currencyIn = new Token(TOKEN_PROGRAM_ID, currencyInMint, currencyInDecimals)
+    const amountIn = new TokenAmount(currencyIn, rawAmountIn, false)
+    const currencyOut = new Token(TOKEN_PROGRAM_ID, currencyOutMint, currencyOutDecimals)
+    const slippage = new Percent(slip, 100) // 5% slippage
+
+    const { amountOut, minAmountOut, currentPrice, executionPrice, priceImpact, fee } = Liquidity.computeAmountOut({
+      poolKeys,
+      poolInfo,
+      amountIn,
+      currencyOut,
+      slippage,
+    })
+
+    return {
+      amountIn,
+      amountOut,
+      minAmountOut,
+      currentPrice,
+      executionPrice,
+      priceImpact,
+      fee,
+    }
+  }
+}
+
+export default RaydiumSwap
+
